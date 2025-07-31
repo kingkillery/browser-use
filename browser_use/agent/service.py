@@ -24,6 +24,7 @@ from browser_use.agent.cloud_events import (
 )
 from browser_use.agent.message_manager.utils import save_conversation
 from browser_use.dom.views import DEFAULT_INCLUDE_ATTRIBUTES
+from browser_use.llm.any_llm import ChatAnyLLM
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import BaseMessage, UserMessage
 from browser_use.tokens.service import TokenCost
@@ -189,6 +190,12 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		step_timeout: int = 180,
 		**kwargs,
 	):
+		if llm is None:
+			llm = ChatAnyLLM(
+				model=os.getenv("ANYLLM_MODEL", "openrouter/z-ai/glm-4.5-air:free"),
+				api_key=os.getenv("OPENROUTER_API_KEY"),
+			)
+
 		if not isinstance(llm, BaseChatModel):
 			raise ValueError('invalid llm, must be from browser_use.llm')
 		# Check for deprecated planner parameters

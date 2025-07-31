@@ -59,21 +59,10 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
 	setattr(logging, methodName, logToRoot)
 
 
+import os
+
 def setup_logging(stream=None, log_level=None, force_setup=False):
-	"""Setup logging configuration for browser-use.
-
-	Args:
-		stream: Output stream for logs (default: sys.stdout). Can be sys.stderr for MCP mode.
-		log_level: Override log level (default: uses CONFIG.BROWSER_USE_LOGGING_LEVEL)
-		force_setup: Force reconfiguration even if handlers already exist
-	"""
-	# Try to add RESULT level, but ignore if it already exists
-	try:
-		addLoggingLevel('RESULT', 35)  # This allows ERROR, FATAL and CRITICAL
-	except AttributeError:
-		pass  # Level already exists, which is fine
-
-	log_type = log_level or CONFIG.BROWSER_USE_LOGGING_LEVEL
+	log_type = log_level or os.getenv('BROWSER_USE_LOGGING_LEVEL', 'info').lower()
 
 	# Check if handlers are already set up
 	if logging.getLogger().hasHandlers() and not force_setup:

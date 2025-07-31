@@ -81,6 +81,7 @@ from browser_use.config import get_default_llm, get_default_profile, load_browse
 from browser_use.controller.service import Controller
 from browser_use.filesystem.file_system import FileSystem
 from browser_use.llm.openai.chat import ChatOpenAI
+from browser_use.llm.openrouter.chat import ChatOpenRouter
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +182,7 @@ class BrowserUseServer:
 		self.agent: Agent | None = None
 		self.browser_session: BrowserSession | None = None
 		self.controller: Controller | None = None
-		self.llm: ChatOpenAI | None = None
+		self.llm: ChatOpenAI | ChatOpenRouter | None = None
 		self.file_system: FileSystem | None = None
 		self._telemetry = ProductTelemetry()
 		self._start_time = time.time()
@@ -487,12 +488,19 @@ class BrowserUseServer:
 		# Initialize LLM from config
 		llm_config = get_default_llm(self.config)
 		if api_key := llm_config.get('api_key'):
-			self.llm = ChatOpenAI(
-				model=llm_config.get('model', 'gpt-4o-mini'),
-				api_key=api_key,
-				temperature=llm_config.get('temperature', 0.7),
-				# max_tokens=llm_config.get('max_tokens'),
-			)
+			provider = llm_config.get('provider')
+			if provider == 'openrouter':
+				self.llm = ChatOpenRouter(
+					model=llm_config.get('model', 'gpt-4o-mini'),
+					api_key=api_key,
+					temperature=llm_config.get('temperature', 0.7),
+				)
+			else:
+				self.llm = ChatOpenAI(
+					model=llm_config.get('model', 'gpt-4o-mini'),
+					api_key=api_key,
+					temperature=llm_config.get('temperature', 0.7),
+				)
 
 		# Initialize FileSystem for extraction actions
 		file_system_path = profile_config.get('file_system_path', '~/.browser-use-mcp')
@@ -513,9 +521,9 @@ class BrowserUseServer:
 
 		# Get LLM config
 		llm_config = get_default_llm(self.config)
-		api_key = llm_config.get('api_key') or os.getenv('OPENAI_API_KEY')
+		api_key = llm_config.get('api_key') or os.getenv('OPENAI_API_KEY') or os.getenv('OPENROUTER_API_KEY')
 		if not api_key:
-			return 'Error: OPENAI_API_KEY not set in config or environment'
+			return 'Error: OPENAI_API_KEY or OPENROUTER_API_KEY not set in config or environment'
 
 		# Override model if provided in tool call
 		if model != llm_config.get('model', 'gpt-4o'):
@@ -523,11 +531,19 @@ class BrowserUseServer:
 		else:
 			llm_model = llm_config.get('model', 'gpt-4o')
 
-		llm = ChatOpenAI(
-			model=llm_model,
-			api_key=api_key,
-			temperature=llm_config.get('temperature', 0.7),
-		)
+		provider = llm_config.get('provider')
+		if provider == 'openrouter':
+			llm = ChatOpenRouter(
+				model=llm_model,
+				api_key=api_key,
+				temperature=llm_config.get('temperature', 0.7),
+			)
+		else:
+			llm = ChatOpenAI(
+				model=llm_model,
+				api_key=api_key,
+				temperature=llm_config.get('temperature', 0.7),
+			)
 
 		# Get profile config and merge with tool parameters
 		profile_config = get_default_profile(self.config)

@@ -31,11 +31,7 @@ dependencies = [
     "typing-extensions>=4.12.2",
     "uuid7>=0.1.0",
     "authlib>=1.6.0",
-    "google-genai>=1.26.0",
-    "openai>=1.97.0",
-    "anthropic>=0.58.2",
-    "groq>=0.30.0",
-    "ollama>=0.5.1",
+    "any-llm @ git+https://github.com/mozilla-ai/any-llm.git",
     "google-api-python-client>=2.174.0",
     "google-auth>=2.40.3",
     "google-auth-oauthlib>=1.2.2",
@@ -156,7 +152,7 @@ testpaths = [
     "tests"
 ]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-svx --strict-markers --tb=short --dist=loadscope"
+
 log_cli = true
 log_cli_format = "%(levelname)-8s [%(name)s] %(message)s"
 filterwarnings = [

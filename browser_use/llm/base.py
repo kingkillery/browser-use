@@ -1,57 +1,55 @@
-"""
-We have switched all of our code from langchain to openai.types.chat.chat_completion_message_param.
+from __future__ import annotations
 
-For easier transition we have
-"""
-
-from typing import Any, Protocol, TypeVar, overload, runtime_checkable
-
-from pydantic import BaseModel
-
+from abc import ABC, abstractmethod
+from typing import TypeVar, overload
 from browser_use.llm.messages import BaseMessage
 from browser_use.llm.views import ChatInvokeCompletion
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T")
 
 
-@runtime_checkable
-class BaseChatModel(Protocol):
-	_verified_api_keys: bool = False
+class BaseChatModel(ABC):
+    """Abstract base class for all chat models."""
 
-	model: str
+    model: str
 
-	@property
-	def provider(self) -> str: ...
+    @property
+    @abstractmethod
+    def provider(self) -> str:
+        """The provider name for this model."""
+        ...
 
-	@property
-	def name(self) -> str: ...
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """The name of the model."""
+        ...
 
-	@property
-	def model_name(self) -> str:
-		# for legacy support
-		return self.model
+    @overload
+    async def ainvoke(
+        self, messages: list[BaseMessage], output_format: None = None
+    ) -> ChatInvokeCompletion[str]:
+        ...
 
-	@overload
-	async def ainvoke(self, messages: list[BaseMessage], output_format: None = None) -> ChatInvokeCompletion[str]: ...
+    @overload
+    async def ainvoke(
+        self, messages: list[BaseMessage], output_format: type[T]
+    ) -> ChatInvokeCompletion[T]:
+        ...
 
-	@overload
-	async def ainvoke(self, messages: list[BaseMessage], output_format: type[T]) -> ChatInvokeCompletion[T]: ...
+    @abstractmethod
+    async def ainvoke(
+        self, messages: list[BaseMessage], output_format: type[T] | None = None
+    ) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
+        """
+        Asynchronously invoke the chat model.
 
-	async def ainvoke(
-		self, messages: list[BaseMessage], output_format: type[T] | None = None
-	) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]: ...
+        Args:
+            messages: A list of messages to send to the model.
+            output_format: The desired output format. If a Pydantic model is provided,
+                           the model will return a structured output.
 
-	@classmethod
-	def __get_pydantic_core_schema__(
-		cls,
-		source_type: type,
-		handler: Any,
-	) -> Any:
-		"""
-		Allow this Protocol to be used in Pydantic models -> very useful to typesafe the agent settings for example.
-		Returns a schema that allows any object (since this is a Protocol).
-		"""
-		from pydantic_core import core_schema
-
-		# Return a schema that accepts any object for Protocol types
-		return core_schema.any_schema()
+        Returns:
+            A ChatInvokeCompletion object containing the model's response.
+        """
+        ...

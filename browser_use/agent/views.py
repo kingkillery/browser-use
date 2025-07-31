@@ -28,6 +28,8 @@ from browser_use.tokens.views import UsageSummary
 class AgentSettings(BaseModel):
 	"""Configuration options for the Agent"""
 
+	model_config = ConfigDict(arbitrary_types_allowed=True)
+
 	use_vision: bool = True
 	vision_detail_level: Literal['auto', 'low', 'high'] = 'auto'
 	use_vision_for_planner: bool = False

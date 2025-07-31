@@ -10,9 +10,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from browser_use.llm.anthropic.chat import ChatAnthropic
-from browser_use.llm.google.chat import ChatGoogle
-from browser_use.llm.openai.chat import ChatOpenAI
+from browser_use.llm.any_llm import ChatAnyLLM
 
 load_dotenv()
 
@@ -97,6 +95,7 @@ def get_default_config() -> dict[str, Any]:
 	return {
 		'model': {
 			'name': llm_config.get('model'),
+			'provider': llm_config.get('provider'),
 			'temperature': llm_config.get('temperature', 0.0),
 			'api_keys': {
 				'OPENAI_API_KEY': llm_config.get('api_key', CONFIG.OPENAI_API_KEY),
@@ -104,6 +103,7 @@ def get_default_config() -> dict[str, Any]:
 				'GOOGLE_API_KEY': CONFIG.GOOGLE_API_KEY,
 				'DEEPSEEK_API_KEY': CONFIG.DEEPSEEK_API_KEY,
 				'GROK_API_KEY': CONFIG.GROK_API_KEY,
+				'OPENROUTER_API_KEY': llm_config.get('api_key', getattr(CONFIG, 'OPENROUTER_API_KEY', os.getenv('OPENROUTER_API_KEY', ''))),
 			},
 		},
 		'agent': agent_config,
@@ -192,43 +192,13 @@ def setup_readline_history(history: list[str]) -> None:
 
 
 def get_llm(config: dict[str, Any]):
-	"""Get the language model based on config and available API keys."""
-	model_config = config.get('model', {})
-	model_name = model_config.get('name')
-	temperature = model_config.get('temperature', 0.0)
+    """Get the language model based on config and available API keys."""
+    model_config = config.get('model', {})
+    model_name = model_config.get('name', os.getenv("ANYLLM_MODEL", "openrouter/z-ai/glm-4.5-air:free"))
+    temperature = model_config.get('temperature', 0.0)
+    api_key = model_config.get('api_keys', {}).get('OPENROUTER_API_KEY') or os.getenv('OPENROUTER_API_KEY')
 
-	# Get API key from config or environment
-	api_key = model_config.get('api_keys', {}).get('OPENAI_API_KEY') or CONFIG.OPENAI_API_KEY
-
-	if model_name:
-		if model_name.startswith('gpt'):
-			if not api_key and not CONFIG.OPENAI_API_KEY:
-				print('⚠️  OpenAI API key not found. Please update your config or set OPENAI_API_KEY environment variable.')
-				sys.exit(1)
-			return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key or CONFIG.OPENAI_API_KEY)
-		elif model_name.startswith('claude'):
-			if not CONFIG.ANTHROPIC_API_KEY:
-				print('⚠️  Anthropic API key not found. Please update your config or set ANTHROPIC_API_KEY environment variable.')
-				sys.exit(1)
-			return ChatAnthropic(model=model_name, temperature=temperature)
-		elif model_name.startswith('gemini'):
-			if not CONFIG.GOOGLE_API_KEY:
-				print('⚠️  Google API key not found. Please update your config or set GOOGLE_API_KEY environment variable.')
-				sys.exit(1)
-			return ChatGoogle(model=model_name, temperature=temperature)
-
-	# Auto-detect based on available API keys
-	if api_key or CONFIG.OPENAI_API_KEY:
-		return ChatOpenAI(model='gpt-4o', temperature=temperature, api_key=api_key or CONFIG.OPENAI_API_KEY)
-	elif CONFIG.ANTHROPIC_API_KEY:
-		return ChatAnthropic(model='claude-3-5-sonnet-20241022', temperature=temperature)
-	elif CONFIG.GOOGLE_API_KEY:
-		return ChatGoogle(model='gemini-2.0-flash-exp', temperature=temperature)
-	else:
-		print(
-			'⚠️  No API keys found. Please update your config or set one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY.'
-		)
-		sys.exit(1)
+    return ChatAnyLLM(model=model_name, temperature=temperature, api_key=api_key)
 
 
 class RichLogHandler(logging.Handler):
