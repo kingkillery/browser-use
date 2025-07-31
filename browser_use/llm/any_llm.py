@@ -64,6 +64,7 @@ class ChatAnyLLM(BaseChatModel):
                 max_tokens=self.max_tokens,
                 top_p=self.top_p,
                 api_key=self.api_key,
+                api_base=self.api_base,
             )
 
             completion = response.choices[0].message.content or ""
