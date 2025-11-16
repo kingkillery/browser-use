@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - browseruse
+    restart: unless-stopped

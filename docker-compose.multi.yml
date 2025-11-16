@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  browseruse_a:
+    build: .
+    image: browseruse-local
+    environment:
+      - BROWSER_USE_API_KEY=${BROWSER_USE_API_KEY:-}
+      - BROWSER_USE_PROFILE_NAME=a
+    ports:
+      - "9243:9242"   # app / control port
+      - "9223:9222"   # CDP
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  browseruse_b:
+    image: browseruse-local
+    environment:
+      - BROWSER_USE_API_KEY=${BROWSER_USE_API_KEY:-}
+      - BROWSER_USE_PROFILE_NAME=b
+    ports:
+      - "9244:9242"
+      - "9224:9222"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  browseruse_c:
+    image: browseruse-local
+    environment:
+      - BROWSER_USE_API_KEY=${BROWSER_USE_API_KEY:-}
+      - BROWSER_USE_PROFILE_NAME=c
+    ports:
+      - "9245:9242"
+      - "9225:9222"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

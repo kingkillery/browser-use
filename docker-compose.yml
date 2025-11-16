@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  browseruse:
+    build: .
+    image: browseruse-local
+    environment:
+      - BROWSER_USE_API_KEY=${BROWSER_USE_API_KEY:-}
+      - BROWSER_USE_PROFILE_NAME=${BROWSER_USE_PROFILE_NAME:-default}
+    ports:
+      - "9242:9242"
+      - "9222:9222"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
