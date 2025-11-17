@@ -1,26 +1,43 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from browser_use import Agent, Browser, ChatBrowserUse
 
-BROWSER_ENDPOINTS: Dict[str, str] = {
-    "a": "ws://localhost:9223",  # browseruse_a (docker-compose.multi.yml)
-    "b": "ws://localhost:9224",  # browseruse_b
-    "c": "ws://localhost:9225",  # browseruse_c
-    # Fallback single-browser setup (docker-compose.yml) could be:
-    # "default": "ws://localhost:9222",
-}
+
+def _load_browser_endpoints() -> Dict[str, str]:
+	default = {
+		"a": "ws://localhost:9223",
+		"b": "ws://localhost:9224",
+		"c": "ws://localhost:9225",
+	}
+	raw = os.getenv("BROWSER_ENDPOINTS_JSON")
+	if not raw:
+		return default
+	try:
+		parsed = json.loads(raw)
+		if isinstance(parsed, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()):
+			return parsed  # type: ignore[return-value]
+	except json.JSONDecodeError as exc:
+		raise RuntimeError(f"Invalid BROWSER_ENDPOINTS_JSON: {exc}") from exc
+	return default
+
+
+BROWSER_ENDPOINTS: Dict[str, str] = _load_browser_endpoints()
 
 VALID_API_KEYS: set[str] = set()
 BROWSER_QUEUE: deque[str] = deque(BROWSER_ENDPOINTS.keys())
+TASK_STREAMS: Dict[str, asyncio.Queue[Optional[str]]] = {}
 
 
 def is_api_key_valid(api_key: str | None) -> bool:
@@ -103,6 +120,22 @@ TASKS: Dict[str, Task] = {}
 app = FastAPI(title="Self-Hosted Browser Use Cloud", version="0.1.0")
 
 
+def _create_task_stream(task_id: str) -> None:
+	TASK_STREAMS[task_id] = asyncio.Queue()
+
+
+async def _stream_event(task_id: str, payload: dict[str, Any]) -> None:
+	queue = TASK_STREAMS.get(task_id)
+	if queue:
+		await queue.put(json.dumps(payload))
+
+
+async def _close_task_stream(task_id: str) -> None:
+	queue = TASK_STREAMS.pop(task_id, None)
+	if queue:
+		await queue.put(None)
+
+
 async def require_api_key(
     x_browser_use_api_key: Optional[str] = Header(None, alias="X-Browser-Use-API-Key"),
 ) -> str:
@@ -181,6 +214,8 @@ async def create_task(
     task_id = str(uuid.uuid4())
     task = Task(id=task_id, session_id=session.id, task=body.task)
     TASKS[task_id] = task
+    _create_task_stream(task_id)
+    await _stream_event(task_id, {"event": "task_queued", "taskId": task_id, "sessionId": session.id})
 
     # Kick off background job
     asyncio.create_task(_run_agent_task(task, session, body))
@@ -205,6 +240,25 @@ async def get_task(
         output=task.output,
         steps=task.steps,
     )
+
+
+@app.get("/api/v2/tasks/{task_id}/stream")
+async def stream_task(
+    task_id: str,
+    api_key: str = Depends(require_api_key),
+):
+    queue = TASK_STREAMS.get(task_id)
+    if not queue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task stream not available")
+
+    async def event_generator():
+        while True:
+            message = await queue.get()
+            if message is None:
+                break
+            yield f"data: {message}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ---------------------------------------------------------------------------
